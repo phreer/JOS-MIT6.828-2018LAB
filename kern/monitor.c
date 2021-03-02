@@ -13,7 +13,7 @@
 #include <kern/trap.h>
 
 #define CMDBUF_SIZE	80	// enough for one VGA text line
-
+#define MAX_LEN_FUN_NAME 256
 
 struct Command {
 	const char *name;
@@ -25,6 +25,7 @@ struct Command {
 static struct Command commands[] = {
 	{ "help", "Display this list of commands", mon_help },
 	{ "kerninfo", "Display information about the kernel", mon_kerninfo },
+	{ "backtrace", "Display calling stack", mon_backtrace },
 };
 
 /***** Implementations of basic kernel monitor commands *****/
@@ -59,6 +60,33 @@ int
 mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 {
 	// Your code here.
+	cprintf("Stack backtrace:\n");
+	unsigned long ebp, eip, args[5];
+	ebp = (unsigned long) read_ebp();
+	while (ebp)
+	{
+		int i;
+		unsigned long curr = ebp + sizeof(unsigned long);
+		eip = *((unsigned long *) curr);
+		for (i = 0; i < 5; i++)
+		{
+			curr += sizeof(unsigned long);
+			args[i] = *((unsigned long *) curr);
+		}
+		cprintf("  ebp %08x  eip %08x  args %08x %08x %08x %08x %08x\n", 
+			ebp, eip, args[0], args[1], args[2], args[3], args[4]);
+		struct Eipdebuginfo info;
+		debuginfo_eip(eip, &info);
+		char fn_name_out[MAX_LEN_FUN_NAME];
+		for (i = 0; i < info.eip_fn_namelen; ++i)
+		{
+			fn_name_out[i] = info.eip_fn_name[i];
+		}
+		fn_name_out[info.eip_fn_namelen] = '\0';
+		cprintf("         %s:%u: %s+%u\n", info.eip_file, info.eip_line, 
+			fn_name_out, eip - (unsigned long) info.eip_fn_addr);
+		ebp = *((unsigned long *) ebp);
+	}
 	return 0;
 }
 

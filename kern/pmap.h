@@ -80,6 +80,18 @@ pa2page(physaddr_t pa)
 	return &pages[PGNUM(pa)];
 }
 
+static inline struct PageInfo*
+pa2page_nocheck(physaddr_t pa)
+{
+	return &pages[PGNUM(pa)];
+}
+
+static inline struct PageInfo*
+kva2page(uintptr_t kva)
+{
+	return pa2page(PADDR((void *) kva));
+}
+
 static inline void*
 page2kva(struct PageInfo *pp)
 {
