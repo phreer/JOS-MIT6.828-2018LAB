@@ -28,9 +28,9 @@ extern pde_t *kern_pgdir;
 static inline physaddr_t
 _paddr(const char *file, int line, void *kva)
 {
-	if ((uint32_t)kva < KERNBASE)
+	if ((uint32_t) kva < KERNBASE)
 		_panic(file, line, "PADDR called with invalid kva %08lx", kva);
-	return (physaddr_t)kva - KERNBASE;
+	return (physaddr_t) kva - KERNBASE;
 }
 
 /* This macro takes a physical address and returns the corresponding kernel
@@ -60,6 +60,7 @@ int	page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm);
 void	page_remove(pde_t *pgdir, void *va);
 struct PageInfo *page_lookup(pde_t *pgdir, void *va, pte_t **pte_store);
 void	page_decref(struct PageInfo *pp);
+void	page_incref(struct PageInfo *pp);
 
 void	tlb_invalidate(pde_t *pgdir, void *va);
 
