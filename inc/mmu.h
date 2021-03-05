@@ -81,6 +81,7 @@
 // The start address of the corresponding virtual page frame of virtual 
 // address 'va'
 #define VA_PG_START(va)	((uintptr_t) (va) & ~0xFFF)
+#define VA_PG_END(va)	(((uintptr_t) (va) | 0xFFF) + 1)
 
 // Control Register flags
 #define CR0_PE		0x00000001	// Protection Enable

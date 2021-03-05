@@ -29,6 +29,7 @@ sys_cputs(const char *s, size_t len)
 	i = VA_PG_START(s);
 	end = ROUNDUP(i + len, PGSIZE);
 	cprintf("sys_cputs(): i: %p, end: %x\n", i, end);
+    user_mem_assert(curenv, (void *) s, (size_t) len, 0);
 	while (i < end) {
 		ptep = pgdir_walk(curenv->env_pgdir, (void *) i, 0);
 		if (!ptep || !(*ptep | PTE_P) || !(*ptep | PTE_U)) {
@@ -87,9 +88,6 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 
 	switch (syscallno) {
 	case SYS_cputs:
-		cprintf("syscall(): syscallno: %x, a1: %x\n", syscallno, a1);
-		cprintf("syscall(): a2: %x, a3: %x\n", a2, a3);
-		cprintf("syscall(): a4: %x, a5: %x\n", a4, a5);
 		sys_cputs((char *) a1, (size_t) a2);
 		break;
 	case SYS_cgetc:
