@@ -67,16 +67,13 @@ TRAPHANDLER(align_handler, 17);
 TRAPHANDLER(mchk_handler, 18);
 TRAPHANDLER(simderr_handler, 19);
 
+TRAPHANDLER_NOEC(syscall_handler, 48);
+
 /*
  * Lab 3: Your code here for _alltraps
  */
 .align 8
 _alltraps:
-/*
-	pushl $trap_msg
-	call cprintf
-	popl %eax
- */
 	pushl %ds;
 	pushl %es;
 	pushal;

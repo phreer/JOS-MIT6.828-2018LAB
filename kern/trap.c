@@ -37,6 +37,7 @@ extern void fperr_handler();
 extern void align_handler();
 extern void mchk_handler();
 extern void simderr_handler();
+extern void syscall_handler();
 
 void (*handlers[]) () = {
 	divide_handler, 
@@ -109,12 +110,14 @@ trap_init(void)
 	extern struct Segdesc gdt[];
 	size_t i;
 	// LAB 3: Your code here.
-	cprintf("handlers[0]: %p\n", handlers[0]);
-	cprintf("idt: %p\n", idt);
 	for (i = 0; i < 20; i++) {
-		SETGATE(idt[i], 0, GD_KT, handlers[i], 0);
+		if (i == T_BRKPT) {
+			SETGATE(idt[i], 0, GD_KT, handlers[i], 3);
+		} else {
+			SETGATE(idt[i], 0, GD_KT, handlers[i], 0);
+		}
 	}
-
+	SETGATE(idt[T_SYSCALL], 1, GD_KT, syscall_handler, 3);
 	// Per-CPU setup 
 	trap_init_percpu();
 }
@@ -193,6 +196,25 @@ trap_dispatch(struct Trapframe *tf)
 {
 	// Handle processor exceptions.
 	// LAB 3: Your code here.
+	cprintf("trap_dispatch: trapno: %d\n", tf->tf_trapno);
+	int32_t res;
+	switch(tf->tf_trapno) {
+	case T_PGFLT:
+		page_fault_handler(tf);
+		break;
+	case T_BRKPT:
+		monitor(tf);
+		break;
+	case T_SYSCALL:
+		res = syscall(tf->tf_regs.reg_eax, 
+				tf->tf_regs.reg_edx, 
+				tf->tf_regs.reg_ecx, 
+				tf->tf_regs.reg_ebx, 
+				tf->tf_regs.reg_edi, 
+				tf->tf_regs.reg_esi); 
+		tf->tf_regs.reg_eax = res;
+		return;
+	}
 
 	// Unexpected trap: The user process or the kernel has a bug.
 	print_trapframe(tf);
@@ -254,6 +276,9 @@ page_fault_handler(struct Trapframe *tf)
 	// Handle kernel-mode page faults.
 
 	// LAB 3: Your code here.
+	if ((tf->tf_cs && 3) == 0) {
+		panic("page_fault_handler(): pgflt occurred in kernel mode\n");
+	}
 
 	// We've already handled kernel-mode exceptions, so if we get here,
 	// the page fault happened in user mode.
