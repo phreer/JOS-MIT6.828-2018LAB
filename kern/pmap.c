@@ -595,11 +595,10 @@ user_mem_check(struct Env *env, const void *va, size_t len, int perm)
     	pte_t *ptep;
     	start = VA_PG_START(va);
     	end = VA_PG_END(va + len);
-    	cprintf("user_mem_check(): va: %p, va + len: %p\n", va, va + len);
-    	cprintf("user_mem_check(): start: %p, end: %p\n", start, end);
+	perm = perm | PTE_P;
     	for (i = start; i < end; i += PGSIZE) {
     		ptep = pgdir_walk(env->env_pgdir, (void *) i, 0);
-    	    	if (!ptep || !(*ptep & PTE_P) || !(*ptep & perm & (~PTE_P))) {
+    	    	if (!ptep || (*ptep & perm) != perm) {
 			if (i == start) user_mem_check_addr = (uintptr_t) va;
 			else user_mem_check_addr = i;
     			return -E_FAULT;
