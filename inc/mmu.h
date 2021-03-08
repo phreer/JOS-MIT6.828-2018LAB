@@ -75,6 +75,14 @@
 // Address in page table or page directory entry
 #define PTE_ADDR(pte)	((physaddr_t) (pte) & ~0xFFF)
 
+// The start address of the corresponding page frame of physical address 'pa'
+#define PA_PG_START(pa)	PTE_ADDR((pa));
+
+// The start address of the corresponding virtual page frame of virtual 
+// address 'va'
+#define VA_PG_START(va)	((uintptr_t) (va) & ~0xFFF)
+#define VA_PG_END(va)	(((uintptr_t) (va) | 0xFFF) + 1)
+
 // Control Register flags
 #define CR0_PE		0x00000001	// Protection Enable
 #define CR0_MP		0x00000002	// Monitor coProcessor
@@ -139,6 +147,8 @@
 #define SEG_NULL						\
 	.word 0, 0;						\
 	.byte 0, 0, 0, 0
+// G: 1, means unit for segment limit is 4KB
+// DPL: 00, P: 1, S: 1 (Code segment or data segment)
 #define SEG(type,base,lim)					\
 	.word (((lim) >> 12) & 0xffff), ((base) & 0xffff);	\
 	.byte (((base) >> 16) & 0xff), (0x90 | (type)),		\

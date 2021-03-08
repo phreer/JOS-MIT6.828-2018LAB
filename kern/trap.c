@@ -22,6 +22,51 @@ static struct Taskstate ts;
  */
 static struct Trapframe *last_tf;
 
+extern void divide_handler();
+extern void debug_handler();
+extern void nmi_handler();
+extern void brkpt_handler();
+extern void oflow_handler();
+extern void bound_handler();
+extern void illop_handler();
+extern void device_handler();
+extern void dblflt_handler();
+extern void coproc_handler();
+extern void tss_handler();
+extern void segnp_handler();
+extern void stack_handler();
+extern void gpflt_handler();
+extern void pgflt_handler();
+extern void res_handler();
+extern void fperr_handler();
+extern void align_handler();
+extern void mchk_handler();
+extern void simderr_handler();
+extern void syscall_handler();
+
+void (*handlers[]) () = {
+	divide_handler, 
+	debug_handler, 
+	nmi_handler,
+	brkpt_handler,
+	oflow_handler,
+	bound_handler,
+	illop_handler,
+	device_handler,
+	dblflt_handler,
+	coproc_handler,
+	tss_handler,
+	segnp_handler,
+	stack_handler,
+	gpflt_handler,
+	pgflt_handler,
+	res_handler,
+	fperr_handler,
+	align_handler,
+	mchk_handler,
+	simderr_handler
+};
+
 /* Interrupt descriptor table.  (Must be built at run time because
  * shifted function addresses can't be represented in relocation records.)
  */
@@ -70,9 +115,16 @@ void
 trap_init(void)
 {
 	extern struct Segdesc gdt[];
-
+	size_t i;
 	// LAB 3: Your code here.
-
+	for (i = 0; i < 20; i++) {
+		if (i == T_BRKPT) {
+			SETGATE(idt[i], 0, GD_KT, handlers[i], 3);
+		} else {
+			SETGATE(idt[i], 0, GD_KT, handlers[i], 0);
+		}
+	}
+	SETGATE(idt[T_SYSCALL], 1, GD_KT, syscall_handler, 3);
 	// Per-CPU setup 
 	trap_init_percpu();
 }
@@ -176,6 +228,25 @@ trap_dispatch(struct Trapframe *tf)
 {
 	// Handle processor exceptions.
 	// LAB 3: Your code here.
+	cprintf("trap_dispatch: trapno: %d\n", tf->tf_trapno);
+	int32_t res;
+	switch(tf->tf_trapno) {
+	case T_PGFLT:
+		page_fault_handler(tf);
+		break;
+	case T_BRKPT:
+		monitor(tf);
+		break;
+	case T_SYSCALL:
+		res = syscall(tf->tf_regs.reg_eax, 
+				tf->tf_regs.reg_edx, 
+				tf->tf_regs.reg_ecx, 
+				tf->tf_regs.reg_ebx, 
+				tf->tf_regs.reg_edi, 
+				tf->tf_regs.reg_esi); 
+		tf->tf_regs.reg_eax = res;
+		return;
+	}
 
 	// Handle spurious interrupts
 	// The hardware sometimes raises these because of noise on the
@@ -271,6 +342,9 @@ page_fault_handler(struct Trapframe *tf)
 	// Handle kernel-mode page faults.
 
 	// LAB 3: Your code here.
+	if ((tf->tf_cs && 3) == 0) {
+		panic("page_fault_handler(): pgflt occurred in kernel mode\n");
+	}
 
 	// We've already handled kernel-mode exceptions, so if we get here,
 	// the page fault happened in user mode.
