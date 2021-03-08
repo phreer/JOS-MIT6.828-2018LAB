@@ -27,9 +27,9 @@ sys_cputs(const char *s, size_t len)
 	pte_t *ptep;
 	cprintf("sys_cputs(): s: %p, len: %x\n", s, len);
 	i = VA_PG_START(s);
-	end = ROUNDUP(i + len, PGSIZE);
+	end = VA_PG_END(s + len);
 	cprintf("sys_cputs(): i: %p, end: %x\n", i, end);
-    user_mem_assert(curenv, (void *) s, (size_t) len, 0);
+	user_mem_assert(curenv, (void *) s, (size_t) len, 0);
 	while (i < end) {
 		ptep = pgdir_walk(curenv->env_pgdir, (void *) i, 0);
 		if (!ptep || !(*ptep | PTE_P) || !(*ptep | PTE_U)) {
