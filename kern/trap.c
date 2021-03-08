@@ -109,8 +109,10 @@ trap_init(void)
 	extern struct Segdesc gdt[];
 	size_t i;
 	// LAB 3: Your code here.
+	cprintf("handlers[0]: %p\n", handlers[0]);
+	cprintf("idt: %p\n", idt);
 	for (i = 0; i < 20; i++) {
-		SETGATE(idt[i], 1, GD_KT, handlers[i], 0);
+		SETGATE(idt[i], 0, GD_KT, handlers[i], 0);
 	}
 
 	// Per-CPU setup 

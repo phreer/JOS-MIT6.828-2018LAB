@@ -204,7 +204,8 @@ mem_init(void)
 	boot_map_region(kern_pgdir, 
 			UENVS, 
 			NENV * sizeof(struct Env), 
-			PADDR(envs), PTE_U);
+			PADDR(envs), 
+			PTE_U);
 
 	//////////////////////////////////////////////////////////////////////
 	// Use the physical memory that 'bootstack' refers to as the kernel
@@ -219,8 +220,9 @@ mem_init(void)
 	// Your code goes here:
 	boot_map_region(kern_pgdir, 
 			KSTACKTOP - KSTKSIZE, 
-			KSTKSIZE, PADDR(bootstack), 
-			PTE_P);
+			KSTKSIZE, 
+			PADDR(bootstack), 
+			PTE_W);
 
 	//////////////////////////////////////////////////////////////////////
 	// Map all of physical memory at KERNBASE.

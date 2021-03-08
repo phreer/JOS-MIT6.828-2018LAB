@@ -70,12 +70,22 @@ TRAPHANDLER(simderr_handler, 19);
 /*
  * Lab 3: Your code here for _alltraps
  */
-.type _alltraps, @function
+.align 8
 _alltraps:
+/*
+	pushl $trap_msg
+	call cprintf
+	popl %eax
+ */
 	pushl %ds;
 	pushl %es;
 	pushal;
-	mov GD_KD, %ds;
-	mov GD_KD, %es;
+	movw $GD_KD, %eax;
+	movw %eax, %ds;
+	movw %eax, %es;
 	pushl %esp;
 	call trap
+
+.data
+trap_msg:
+.string "trap invoke\n"
