@@ -112,7 +112,7 @@ boot_alloc(uint32_t n)
 		nextfree += (num_pages << PGSHIFT);
 		if ((unsigned long) (nextfree - end) >= PTSIZE)
 		{
-			panic("Out of memory.");
+			panic("boot_alloc: out of memory.");
 		}
 	}
 	return result;
@@ -167,6 +167,7 @@ mem_init(void)
 	//////////////////////////////////////////////////////////////////////
 	// Make 'envs' point to an array of size 'NENV' of 'struct Env'.
 	// LAB 3: Your code here.
+	envs = (struct Env *) boot_alloc(NENV * sizeof(struct Env));
 
 	//////////////////////////////////////////////////////////////////////
 	// Now that we've allocated the initial kernel data structures, we set
@@ -200,6 +201,10 @@ mem_init(void)
 	//    - the new image at UENVS  -- kernel R, user R
 	//    - envs itself -- kernel RW, user NONE
 	// LAB 3: Your code here.
+	boot_map_region(kern_pgdir, 
+			UENVS, 
+			NENV * sizeof(struct Env), 
+			PADDR(envs), PTE_U);
 
 	//////////////////////////////////////////////////////////////////////
 	// Use the physical memory that 'bootstack' refers to as the kernel
@@ -225,7 +230,7 @@ mem_init(void)
 	// we just set up the mapping anyway.
 	// Permissions: kernel RW, user NONE
 	// Your code goes here:
-	boot_map_region(kern_pgdir, KERNBASE, -KERNBASE, 0, PTE_P | PTE_W);
+	boot_map_region(kern_pgdir, KERNBASE, -KERNBASE, 0, PTE_W);
 
 	// Check that the initial page directory has been set up correctly.
 	check_kern_pgdir();
@@ -294,8 +299,9 @@ page_init(void)
 		pages[i].pp_link = page_free_list;
 		page_free_list = &pages[i];
 	}
-	border = (size_t) PADDR(pages) >> PGSHIFT;
-	border += ((npages * sizeof(struct PageInfo)) >> PGSHIFT) + 1;
+	border = PGNUM(PADDR(pages));
+	border += PGNUM((npages * sizeof(struct PageInfo))) + 1;
+	border += PGNUM(NENV * sizeof(struct Env)) + 1;
 	for (i = (IOPHYSMEM >> PGSHIFT); i < border; ++i) {
 		pages[i].pp_ref = 1;
 		pages[i].pp_link = NULL;
@@ -413,9 +419,6 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 		struct PageInfo *page = page_alloc(ALLOC_ZERO);
 		if (page == NULL) return NULL;
 		page_incref(page);
-		cprintf("page: %p\n", page);
-		cprintf("page->pp_ref: %u\n", page->pp_ref);
-		cprintf("page->pp_link: %p\n", page->pp_link);
 		*va_pde = page2pa(page) | PTE_P | PTE_W | PTE_U;
 	}
 	ptep = (pte_t *) KADDR(PTE_ADDR(*va_pde)) + PTX(va);
@@ -450,6 +453,8 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
 	}
 }
 
+//
+// NOOTE: This function will not free page 'pp'. 
 //
 // Map the physical page 'pp' at virtual address 'va'.
 // The permissions (the low 12 bits) of the page table entry
@@ -659,7 +664,8 @@ check_page_free_list(bool only_low_memory)
 		assert(page2pa(pp) != IOPHYSMEM);
 		assert(page2pa(pp) != EXTPHYSMEM - PGSIZE);
 		assert(page2pa(pp) != EXTPHYSMEM);
-		assert(page2pa(pp) < EXTPHYSMEM || (char *) page2kva(pp) >= first_free_page);
+		assert(page2pa(pp) < EXTPHYSMEM 
+			|| (char *) page2kva(pp) >= first_free_page);
 
 		if (page2pa(pp) < EXTPHYSMEM)
 			++nfree_basemem;

@@ -17,6 +17,50 @@ static struct Taskstate ts;
  */
 static struct Trapframe *last_tf;
 
+extern void divide_handler();
+extern void debug_handler();
+extern void nmi_handler();
+extern void brkpt_handler();
+extern void oflow_handler();
+extern void bound_handler();
+extern void illop_handler();
+extern void device_handler();
+extern void dblflt_handler();
+extern void coproc_handler();
+extern void tss_handler();
+extern void segnp_handler();
+extern void stack_handler();
+extern void gpflt_handler();
+extern void pgflt_handler();
+extern void res_handler();
+extern void fperr_handler();
+extern void align_handler();
+extern void mchk_handler();
+extern void simderr_handler();
+
+void (*handlers[]) () = {
+	divide_handler, 
+	debug_handler, 
+	nmi_handler,
+	brkpt_handler,
+	oflow_handler,
+	bound_handler,
+	illop_handler,
+	device_handler,
+	dblflt_handler,
+	coproc_handler,
+	tss_handler,
+	segnp_handler,
+	stack_handler,
+	gpflt_handler,
+	pgflt_handler,
+	res_handler,
+	fperr_handler,
+	align_handler,
+	mchk_handler,
+	simderr_handler
+};
+
 /* Interrupt descriptor table.  (Must be built at run time because
  * shifted function addresses can't be represented in relocation records.)
  */
@@ -63,8 +107,11 @@ void
 trap_init(void)
 {
 	extern struct Segdesc gdt[];
-
+	size_t i;
 	// LAB 3: Your code here.
+	for (i = 0; i < 20; i++) {
+		SETGATE(idt[i], 1, GD_KT, handlers[i], 0);
+	}
 
 	// Per-CPU setup 
 	trap_init_percpu();
