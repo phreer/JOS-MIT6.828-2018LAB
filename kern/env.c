@@ -280,11 +280,58 @@ region_alloc(struct Env *e, void *va, size_t len)
 	//   (Watch out for corner-cases!)
 	struct PageInfo *pp;
 	size_t end = ROUNDUP((uintptr_t) va + len, PGSIZE);
+	pte_t *ptep;
 	size_t i;
 	va = (void *) VA_PG_START(va);
-	for (i = (uintptr_t) va; i < end; ++i) {
-		pp = page_alloc(0);
-		page_insert(e->env_pgdir, pp, (void *) i, PTE_W | PTE_U);
+	for (i = (uintptr_t) va; i < end; i += PGSIZE) {
+		if (!(ptep = pgdir_walk(e->env_pgdir, (void *) i, 1)))
+			panic("region_alloc: out of memory\n");
+		if (!(*ptep & PTE_P)) {
+			pp = page_alloc(0);
+			if (!pp) panic("region_alloc: out of memory\n");
+			*ptep = (uintptr_t) page2pa(pp) | PTE_P | PTE_W | PTE_U;
+		}
+	}
+}
+
+static void
+_load_segment(struct Env *e, struct Proghdr *ph, uintptr_t binary) {
+	size_t i, j, n, start, end, count;
+	char *src, *dst;
+	region_alloc(e, (void *) ph->p_va, ph->p_memsz);
+	cprintf("ph->p_va: %p\n", ph->p_va);
+	cprintf("ph->p_memsz: %u\n", ph->p_memsz);
+	cprintf("end_va: %p\n", (uintptr_t) ph->p_va + ph->p_memsz);
+	i = VA_PG_START(ph->p_va);
+	n = ROUNDUP(ph->p_va + ph->p_memsz, PGSIZE);
+	cprintf("i: 0x%08x, n: 0x%08x\n", i, n);
+	count = 0;
+	for (; i < n; i += PGSIZE) {
+		if (i < ph->p_va) {
+			start = PGOFF(ph->p_va);
+		} else {
+			start = 0;
+		}
+		if (i == n - PGSIZE) {
+			end = PGOFF(ph->p_va + ph->p_memsz);
+		} else {
+			end = PGSIZE;
+		}
+		cprintf("start: 0x%08x, end: 0x%08x\n", start, end);
+		pte_t *ptep = pgdir_walk(e->env_pgdir, (void *) i, 0);
+		if (!ptep || !(*ptep & PTE_P)) {
+			panic("load_icode: fail to map region\n");
+		}
+		src = (char *) binary + ph->p_offset;
+		dst = (char *) KADDR(PTE_ADDR(*ptep));
+		for (j = start; j < end; ++j) {
+			if (i + j <= ph->p_va + ph->p_filesz) {
+				dst[j] = src[count];
+			} else {
+				dst[j] = 0;
+			}
+			count++;
+		}	
 	}
 }
 
@@ -342,45 +389,17 @@ load_icode(struct Env *e, uint8_t *binary)
 	//  What?  (See env_run() and env_pop_tf() below.)
 
 	// LAB 3: Your code here.
-	size_t i, j, n, start, end;
+	size_t phdr_i;
 	struct Elf *elf_hdr = (struct Elf *) binary;
-	char *src;
 	if (elf_hdr->e_magic != ELF_MAGIC) {
 		panic("load_icode: invalid elf header\n");
 	}
 	struct Proghdr *ph =\
-		(struct Proghdr *) ((long) elf_hdr + elf_hdr->e_phoff);
-	if (ph->p_type != ELF_PROG_LOAD) {
-		panic("load_icode: program is not loadable\n");
-	}
-	region_alloc(e, (void *) ph->p_va, ph->p_memsz);
-	cprintf("ph->p_va: %p\n", ph->p_va);
-	cprintf("ph->p_memsz: %u\n", ph->p_memsz);
-	i = VA_PG_START(ph->p_va);
-	n = ROUNDUP(ph->p_va + ph->p_memsz, PGSIZE);
-	for (; i < n; i += PGSIZE) {
-		if (i < ph->p_va) {
-			start = PGOFF(ph->p_va);
-		} else {
-			start = 0;
+		(struct Proghdr *) ((uint8_t *) elf_hdr + elf_hdr->e_phoff);
+	for (phdr_i = 0; phdr_i < elf_hdr->e_phnum; ++phdr_i, ph++) {
+		if (ph->p_type == ELF_PROG_LOAD) {
+			_load_segment(e, ph, (uintptr_t) binary);
 		}
-		if (i == n - PGSIZE) {
-			end = PGOFF(ph->p_va + ph->p_memsz);
-		} else {
-			end = PGSIZE;
-		}
-		pte_t *ptep = pgdir_walk(e->env_pgdir, (void *) i, 0);
-		if (!ptep) {
-			panic("load_icode: cannot find pte\n");
-		}
-		src = (char *) binary + ph->p_offset;
-		for (j = start; j < end; ++j) {
-			if (i + j < ph->p_filesz) {
-				*(char *) KADDR(PTE_ADDR(*ptep) + j) = src[i];
-			} else {
-				*(char *) KADDR(PTE_ADDR(*ptep) + j) = 0;
-			}
-		}	
 	}
 	e->env_tf.tf_eip = elf_hdr->e_entry;
 	// Now map one page for the program's initial stack
